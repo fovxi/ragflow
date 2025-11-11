@@ -657,6 +657,7 @@ class TenantLLM(DataBaseModel):
     api_base = CharField(max_length=255, null=True, help_text="API Base")
     max_tokens = IntegerField(default=8192, index=True)
     used_tokens = IntegerField(default=0, index=True)
+    llm_workbench_user_id = CharField(max_length=36, null=True, index=True, help_text="LLM Workbench User ID")
 
     def __str__(self):
         return self.llm_name
@@ -707,6 +708,7 @@ class Knowledgebase(DataBaseModel):
     mindmap_task_id = CharField(max_length=32, null=True, help_text="Mindmap task ID", index=True)
     mindmap_task_finish_at = DateTimeField(null=True)
 
+    llm_workbench_user_id = CharField(max_length=36, null=True, index=True, help_text="LLM Workbench User ID")
     status = CharField(max_length=1, null=True, help_text="is it validate(0: wasted, 1: validate)", default="1", index=True)
 
     def __str__(self):
@@ -829,6 +831,7 @@ class Conversation(DataBaseModel):
     message = JSONField(null=True)
     reference = JSONField(null=True, default=[])
     user_id = CharField(max_length=255, null=True, help_text="user_id", index=True)
+    llm_workbench_user_id = CharField(max_length=36, null=True, index=True, help_text="LLM Workbench User ID")
 
     class Meta:
         db_table = "conversation"
@@ -955,6 +958,7 @@ class Search(DataBaseModel):
             "query_mindmap": False,
         },
     )
+    llm_workbench_user_id = CharField(max_length=36, null=True, index=True, help_text="LLM Workbench User ID")
     status = CharField(max_length=1, null=True, help_text="is it validate(0: wasted, 1: validate)", default="1", index=True)
 
     def __str__(self):
@@ -1162,4 +1166,66 @@ def migrate_db():
         migrate(migrator.alter_column_type("tenant_llm", "api_key", TextField(null=True, help_text="API KEY")))
     except Exception:
         pass
+    
+    # ============================================================
+    # LLM-Workbench 多用户支持迁移
+    # ============================================================
+    
+    try:
+        migrate(migrator.add_column(
+            "knowledgebase", 
+            "llm_workbench_user_id", 
+            CharField(max_length=36, null=True, index=True, help_text="LLM Workbench User ID")
+        ))
+    except Exception:
+        pass
+    
+    try:
+        migrate(migrator.add_column(
+            "conversation", 
+            "llm_workbench_user_id", 
+            CharField(max_length=36, null=True, index=True, help_text="LLM Workbench User ID")
+        ))
+    except Exception:
+        pass
+    
+    try:
+        migrate(migrator.add_column(
+            "search", 
+            "llm_workbench_user_id", 
+            CharField(max_length=36, null=True, index=True, help_text="LLM Workbench User ID")
+        ))
+    except Exception:
+        pass
+    
+    try:
+        migrate(migrator.add_column(
+            "tenant_llm", 
+            "llm_workbench_user_id", 
+            CharField(max_length=36, null=True, index=True, help_text="LLM Workbench User ID")
+        ))
+    except Exception:
+        pass
+    
+    # 为旧数据填充默认 user_id（可选）
+    try:
+        DB.execute_sql(
+            "UPDATE knowledgebase SET llm_workbench_user_id = %s WHERE llm_workbench_user_id IS NULL",
+            ('cc9b490a-64b9-4013-8dd8-785182d3ec5a',)
+        )
+        DB.execute_sql(
+            "UPDATE conversation SET llm_workbench_user_id = %s WHERE llm_workbench_user_id IS NULL",
+            ('cc9b490a-64b9-4013-8dd8-785182d3ec5a',)
+        )
+        DB.execute_sql(
+            "UPDATE search SET llm_workbench_user_id = %s WHERE llm_workbench_user_id IS NULL",
+            ('cc9b490a-64b9-4013-8dd8-785182d3ec5a',)
+        )
+        DB.execute_sql(
+            "UPDATE tenant_llm SET llm_workbench_user_id = %s WHERE llm_workbench_user_id IS NULL",
+            ('cc9b490a-64b9-4013-8dd8-785182d3ec5a',)
+        )
+    except Exception:
+        pass
+    
     logging.disable(logging.NOTSET)

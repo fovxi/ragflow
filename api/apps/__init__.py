@@ -95,6 +95,10 @@ login_manager.init_app(app)
 
 commands.register_commands(app)
 
+# 注册 LLM Workbench 认证中间件
+from api.middlewares.llm_workbench_auth import register_llm_workbench_auth_middleware
+register_llm_workbench_auth_middleware(app)
+
 
 def search_pages_path(pages_dir):
     app_path_list = [

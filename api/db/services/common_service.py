@@ -149,6 +149,13 @@ class CommonService:
         Returns:
             Model instance: The created record object.
         """
+        # Auto-set llm_workbench_user_id if model has this field and it's not provided
+        if hasattr(cls.model, 'llm_workbench_user_id') and 'llm_workbench_user_id' not in kwargs:
+            from api.middlewares.llm_workbench_auth import get_llm_workbench_user_id
+            llm_wb_user_id = get_llm_workbench_user_id()
+            if llm_wb_user_id:
+                kwargs['llm_workbench_user_id'] = llm_wb_user_id
+        
         sample_obj = cls.model(**kwargs).save(force_insert=True)
         return sample_obj
 
@@ -172,6 +179,14 @@ class CommonService:
         kwargs["create_date"] = datetime_format(datetime.now())
         kwargs["update_time"] = current_timestamp()
         kwargs["update_date"] = datetime_format(datetime.now())
+        
+        # Auto-set llm_workbench_user_id if model has this field and it's not provided
+        if hasattr(cls.model, 'llm_workbench_user_id') and 'llm_workbench_user_id' not in kwargs:
+            from api.middlewares.llm_workbench_auth import get_llm_workbench_user_id
+            llm_wb_user_id = get_llm_workbench_user_id()
+            if llm_wb_user_id:
+                kwargs['llm_workbench_user_id'] = llm_wb_user_id
+        
         sample_obj = cls.model(**kwargs).save(force_insert=True)
         return sample_obj
 

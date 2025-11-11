@@ -380,11 +380,19 @@ class KnowledgebaseService(CommonService):
         # Returns:
         #     List of knowledge bases
         #     Total count of knowledge bases
+        from api.middlewares.llm_workbench_auth import get_llm_workbench_user_id
+        
         kbs = cls.model.select()
         if id:
             kbs = kbs.where(cls.model.id == id)
         if name:
             kbs = kbs.where(cls.model.name == name)
+        
+        # Add LLM Workbench user filtering
+        llm_wb_user_id = get_llm_workbench_user_id()
+        if llm_wb_user_id:
+            kbs = kbs.where(cls.model.llm_workbench_user_id == llm_wb_user_id)
+        
         kbs = kbs.where(
             ((cls.model.tenant_id.in_(joined_tenant_ids) & (cls.model.permission ==
                                                             TenantPermission.TEAM.value)) | (
