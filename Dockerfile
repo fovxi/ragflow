@@ -3,7 +3,6 @@ FROM ubuntu:22.04 AS base
 USER root
 SHELL ["/bin/bash", "-c"]
 
-ARG NEED_MIRROR=0
 ARG LIGHTEN=0
 ENV LIGHTEN=${LIGHTEN}
 
@@ -43,10 +42,8 @@ ENV DEBIAN_FRONTEND=noninteractive
 # selenium:      libatk-bridge2.0-0                       chrome-linux64-121-0-6167-85
 # Building C extensions: libpython3-dev libgtk-4-1 libnss3 xdg-utils libgbm-dev
 RUN --mount=type=cache,id=ragflow_apt,target=/var/cache/apt,sharing=locked \
-    if [ "$NEED_MIRROR" == "1" ]; then \
-        sed -i 's|http://ports.ubuntu.com|http://mirrors.tuna.tsinghua.edu.cn|g' /etc/apt/sources.list; \
-        sed -i 's|http://archive.ubuntu.com|http://mirrors.tuna.tsinghua.edu.cn|g' /etc/apt/sources.list; \
-    fi; \
+    sed -i 's|http://ports.ubuntu.com|http://mirrors.tuna.tsinghua.edu.cn|g' /etc/apt/sources.list && \
+    sed -i 's|http://archive.ubuntu.com|http://mirrors.tuna.tsinghua.edu.cn|g' /etc/apt/sources.list && \
     rm -f /etc/apt/apt.conf.d/docker-clean && \
     echo 'Binary::apt::APT::Keep-Downloaded-Packages "true";' > /etc/apt/apt.conf.d/keep-cache && \
     chmod 1777 /tmp && \
@@ -64,14 +61,11 @@ RUN --mount=type=cache,id=ragflow_apt,target=/var/cache/apt,sharing=locked \
 
 RUN curl -LsSf https://astral.sh/uv/install.sh | sh && \
     ln -s /root/.local/bin/uv /usr/local/bin/uv && \
-    ln -s /root/.local/bin/uvx /usr/local/bin/uvx
-
-RUN if [ "$NEED_MIRROR" == "1" ]; then \
-        mkdir -p /etc/uv && \
-        echo "[[index]]" > /etc/uv/uv.toml && \
-        echo 'url = "https://mirrors.aliyun.com/pypi/simple"' >> /etc/uv/uv.toml && \
-        echo "default = true" >> /etc/uv/uv.toml; \
-    fi
+    ln -s /root/.local/bin/uvx /usr/local/bin/uvx && \
+    mkdir -p /etc/uv && \
+    echo "[[index]]" > /etc/uv/uv.toml && \
+    echo 'url = "https://mirrors.aliyun.com/pypi/simple"' >> /etc/uv/uv.toml && \
+    echo "default = true" >> /etc/uv/uv.toml
 
 ENV PYTHONDONTWRITEBYTECODE=1 DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=1
 ENV PATH=/root/.local/bin:$PATH
@@ -85,15 +79,10 @@ RUN --mount=type=cache,id=ragflow_apt,target=/var/cache/apt,sharing=locked \
     apt install -y nodejs
 
 # A modern version of cargo is needed for the latest version of the Rust compiler.
+# Use TUNA mirrors for rustup/rust dist files
 RUN apt update && apt install -y curl build-essential \
-    && if [ "$NEED_MIRROR" == "1" ]; then \
-         # Use TUNA mirrors for rustup/rust dist files
-         export RUSTUP_DIST_SERVER="https://mirrors.tuna.tsinghua.edu.cn/rustup"; \
-         export RUSTUP_UPDATE_ROOT="https://mirrors.tuna.tsinghua.edu.cn/rustup/rustup"; \
-         echo "Using TUNA mirrors for Rustup."; \
-       fi; \
-    # Force curl to use HTTP/1.1
-    curl --proto '=https' --tlsv1.2 --http1.1 -sSf https://sh.rustup.rs | bash -s -- -y --profile minimal \
+    && echo "Using TUNA mirrors for Rustup." && \
+    curl --proto '=https' --tlsv1.2 --http1.1 -sSf https://sh.rustup.rs | RUSTUP_DIST_SERVER="https://mirrors.tuna.tsinghua.edu.cn/rustup" RUSTUP_UPDATE_ROOT="https://mirrors.tuna.tsinghua.edu.cn/rustup/rustup" bash -s -- -y --profile minimal \
     && echo 'export PATH="/root/.cargo/bin:${PATH}"' >> /root/.bashrc
 
 ENV PATH="/root/.cargo/bin:${PATH}"
@@ -150,12 +139,9 @@ COPY pyproject.toml uv.lock ./
 
 # https://github.com/astral-sh/uv/issues/10462
 # uv records index url into uv.lock but doesn't failover among multiple indexes
+# Replace pypi.org with mirrors.aliyun.com/pypi in uv.lock
 RUN --mount=type=cache,id=ragflow_uv,target=/root/.cache/uv,sharing=locked \
-    if [ "$NEED_MIRROR" == "1" ]; then \
-        sed -i 's|pypi.org|mirrors.aliyun.com/pypi|g' uv.lock; \
-    else \
-        sed -i 's|mirrors.aliyun.com/pypi|pypi.org|g' uv.lock; \
-    fi; \
+    sed -i 's|pypi.org|mirrors.aliyun.com/pypi|g' uv.lock && \
     if [ "$LIGHTEN" == "1" ]; then \
         uv sync --python 3.10 --frozen; \
     else \
