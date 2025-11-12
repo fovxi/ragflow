@@ -60,8 +60,10 @@ RUN --mount=type=cache,id=ragflow_apt,target=/var/cache/apt,sharing=locked \
     apt install -y ghostscript
 
 RUN curl -LsSf https://astral.sh/uv/install.sh | sh && \
-    ln -s /root/.local/bin/uv /usr/local/bin/uv && \
-    ln -s /root/.local/bin/uvx /usr/local/bin/uvx && \
+    (ln -s /root/.local/bin/uv /usr/local/bin/uv 2>/dev/null || \
+     ln -s /root/.cargo/bin/uv /usr/local/bin/uv 2>/dev/null || true) && \
+    (ln -s /root/.local/bin/uvx /usr/local/bin/uvx 2>/dev/null || \
+     ln -s /root/.cargo/bin/uvx /usr/local/bin/uvx 2>/dev/null || true) && \
     mkdir -p /etc/uv && \
     echo "[[index]]" > /etc/uv/uv.toml && \
     echo 'url = "https://mirrors.aliyun.com/pypi/simple"' >> /etc/uv/uv.toml && \
