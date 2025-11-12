@@ -60,17 +60,21 @@ RUN --mount=type=cache,id=ragflow_apt,target=/var/cache/apt,sharing=locked \
     apt install -y ghostscript
 
 RUN curl -LsSf https://astral.sh/uv/install.sh | sh && \
-    (ln -s /root/.local/bin/uv /usr/local/bin/uv 2>/dev/null || \
-     ln -s /root/.cargo/bin/uv /usr/local/bin/uv 2>/dev/null || true) && \
-    (ln -s /root/.local/bin/uvx /usr/local/bin/uvx 2>/dev/null || \
-     ln -s /root/.cargo/bin/uvx /usr/local/bin/uvx 2>/dev/null || true) && \
     mkdir -p /etc/uv && \
     echo "[[index]]" > /etc/uv/uv.toml && \
     echo 'url = "https://mirrors.aliyun.com/pypi/simple"' >> /etc/uv/uv.toml && \
-    echo "default = true" >> /etc/uv/uv.toml
+    echo "default = true" >> /etc/uv/uv.toml && \
+    if [ -f /root/.local/bin/uv ]; then \
+        ln -sf /root/.local/bin/uv /usr/local/bin/uv && \
+        ln -sf /root/.local/bin/uvx /usr/local/bin/uvx; \
+    elif [ -f /root/.cargo/bin/uv ]; then \
+        ln -sf /root/.cargo/bin/uv /usr/local/bin/uv && \
+        ln -sf /root/.cargo/bin/uvx /usr/local/bin/uvx; \
+    fi && \
+    uv --version
 
 ENV PYTHONDONTWRITEBYTECODE=1 DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=1
-ENV PATH=/root/.local/bin:$PATH
+ENV PATH=/usr/local/bin:/root/.local/bin:/root/.cargo/bin:$PATH
 
 # nodejs 12.22 on Ubuntu 22.04 is too old
 RUN --mount=type=cache,id=ragflow_apt,target=/var/cache/apt,sharing=locked \
