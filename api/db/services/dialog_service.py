@@ -84,12 +84,20 @@ class DialogService(CommonService):
     @classmethod
     @DB.connection_context()
     def get_list(cls, tenant_id, page_number, items_per_page, orderby, desc, id, name):
+        from api.middlewares.llm_workbench_auth import get_llm_workbench_user_id
+        
         chats = cls.model.select()
         if id:
             chats = chats.where(cls.model.id == id)
         if name:
             chats = chats.where(cls.model.name == name)
         chats = chats.where((cls.model.tenant_id == tenant_id) & (cls.model.status == StatusEnum.VALID.value))
+        
+        # Add LLM Workbench user filtering
+        llm_wb_user_id = get_llm_workbench_user_id()
+        if llm_wb_user_id:
+            chats = chats.where(cls.model.llm_workbench_user_id == llm_wb_user_id)
+        
         if desc:
             chats = chats.order_by(cls.model.getter_by(orderby).desc())
         else:
@@ -103,6 +111,7 @@ class DialogService(CommonService):
     @DB.connection_context()
     def get_by_tenant_ids(cls, joined_tenant_ids, user_id, page_number, items_per_page, orderby, desc, keywords, parser_id=None):
         from api.db.db_models import User
+        from api.middlewares.llm_workbench_auth import get_llm_workbench_user_id
 
         fields = [
             cls.model.id,
@@ -145,6 +154,12 @@ class DialogService(CommonService):
                     (cls.model.tenant_id.in_(joined_tenant_ids) | (cls.model.tenant_id == user_id)) & (cls.model.status == StatusEnum.VALID.value),
                 )
             )
+        
+        # Add LLM Workbench user filtering
+        llm_wb_user_id = get_llm_workbench_user_id()
+        if llm_wb_user_id:
+            dialogs = dialogs.where(cls.model.llm_workbench_user_id == llm_wb_user_id)
+        
         if parser_id:
             dialogs = dialogs.where(cls.model.parser_id == parser_id)
         if desc:
@@ -162,8 +177,16 @@ class DialogService(CommonService):
     @classmethod
     @DB.connection_context()
     def get_all_dialogs_by_tenant_id(cls, tenant_id):
+        from api.middlewares.llm_workbench_auth import get_llm_workbench_user_id
+        
         fields = [cls.model.id]
         dialogs = cls.model.select(*fields).where(cls.model.tenant_id == tenant_id)
+        
+        # Add LLM Workbench user filtering
+        llm_wb_user_id = get_llm_workbench_user_id()
+        if llm_wb_user_id:
+            dialogs = dialogs.where(cls.model.llm_workbench_user_id == llm_wb_user_id)
+        
         dialogs.order_by(cls.model.create_time.asc())
         offset, limit = 0, 100
         res = []

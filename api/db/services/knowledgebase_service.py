@@ -144,6 +144,8 @@ class KnowledgebaseService(CommonService):
         #     parser_id: Optional parser ID filter
         # Returns:
         #     Tuple of (knowledge_base_list, total_count)
+        from api.middlewares.llm_workbench_auth import get_llm_workbench_user_id
+        
         fields = [
             cls.model.id,
             cls.model.avatar,
@@ -161,6 +163,10 @@ class KnowledgebaseService(CommonService):
             User.avatar.alias('tenant_avatar'),
             cls.model.update_time
         ]
+        
+        # Add LLM Workbench user filtering
+        llm_wb_user_id = get_llm_workbench_user_id()
+        
         if keywords:
             kbs = cls.model.select(*fields).join(User, on=(cls.model.tenant_id == User.id)).where(
                 ((cls.model.tenant_id.in_(joined_tenant_ids) & (cls.model.permission ==
@@ -176,6 +182,11 @@ class KnowledgebaseService(CommonService):
                     cls.model.tenant_id == user_id))
                 & (cls.model.status == StatusEnum.VALID.value)
             )
+        
+        # Apply LLM Workbench user filter if user_id is provided
+        if llm_wb_user_id:
+            kbs = kbs.where(cls.model.llm_workbench_user_id == llm_wb_user_id)
+        
         if parser_id:
             kbs = kbs.where(cls.model.parser_id == parser_id)
         if desc:
@@ -194,6 +205,8 @@ class KnowledgebaseService(CommonService):
     @DB.connection_context()
     def get_all_kb_by_tenant_ids(cls, tenant_ids, user_id):
         # will get all permitted kb, be cautious.
+        from api.middlewares.llm_workbench_auth import get_llm_workbench_user_id
+        
         fields = [
             cls.model.name,
             cls.model.language,
@@ -211,6 +224,12 @@ class KnowledgebaseService(CommonService):
                 cls.model.tenant_id == user_id
             )
         )
+        
+        # Add LLM Workbench user filtering
+        llm_wb_user_id = get_llm_workbench_user_id()
+        if llm_wb_user_id:
+            kbs = kbs.where(cls.model.llm_workbench_user_id == llm_wb_user_id)
+        
         # sort by create_time asc
         kbs.order_by(cls.model.create_time.asc())
         # maybe cause slow query by deep paginate, optimize later.
@@ -346,11 +365,19 @@ class KnowledgebaseService(CommonService):
         #     tenant_id: Tenant ID
         # Returns:
         #     Tuple of (exists, knowledge_base)
+        from api.middlewares.llm_workbench_auth import get_llm_workbench_user_id
+        
         kb = cls.model.select().where(
             (cls.model.name == kb_name)
             & (cls.model.tenant_id == tenant_id)
             & (cls.model.status == StatusEnum.VALID.value)
         )
+        
+        # Add LLM Workbench user filtering
+        llm_wb_user_id = get_llm_workbench_user_id()
+        if llm_wb_user_id:
+            kb = kb.where(cls.model.llm_workbench_user_id == llm_wb_user_id)
+        
         if kb:
             return True, kb[0]
         return False, None
@@ -418,10 +445,18 @@ class KnowledgebaseService(CommonService):
         #     user_id: User ID
         # Returns:
         #     Boolean indicating accessibility
+        from api.middlewares.llm_workbench_auth import get_llm_workbench_user_id
+        
         docs = cls.model.select(
             cls.model.id).join(UserTenant, on=(UserTenant.tenant_id == Knowledgebase.tenant_id)
-                               ).where(cls.model.id == kb_id, UserTenant.user_id == user_id).paginate(0, 1)
-        docs = docs.dicts()
+                               ).where(cls.model.id == kb_id, UserTenant.user_id == user_id)
+        
+        # Add LLM Workbench user filtering
+        llm_wb_user_id = get_llm_workbench_user_id()
+        if llm_wb_user_id:
+            docs = docs.where(cls.model.llm_workbench_user_id == llm_wb_user_id)
+        
+        docs = docs.paginate(0, 1).dicts()
         if not docs:
             return False
         return True
@@ -435,9 +470,17 @@ class KnowledgebaseService(CommonService):
         #     user_id: User ID
         # Returns:
         #     List containing knowledge base information
+        from api.middlewares.llm_workbench_auth import get_llm_workbench_user_id
+        
         kbs = cls.model.select().join(UserTenant, on=(UserTenant.tenant_id == Knowledgebase.tenant_id)
-                                      ).where(cls.model.id == kb_id, UserTenant.user_id == user_id).paginate(0, 1)
-        kbs = kbs.dicts()
+                                      ).where(cls.model.id == kb_id, UserTenant.user_id == user_id)
+        
+        # Add LLM Workbench user filtering
+        llm_wb_user_id = get_llm_workbench_user_id()
+        if llm_wb_user_id:
+            kbs = kbs.where(cls.model.llm_workbench_user_id == llm_wb_user_id)
+        
+        kbs = kbs.paginate(0, 1).dicts()
         return list(kbs)
 
     @classmethod
@@ -449,9 +492,17 @@ class KnowledgebaseService(CommonService):
         #     user_id: User ID
         # Returns:
         #     List containing knowledge base information
+        from api.middlewares.llm_workbench_auth import get_llm_workbench_user_id
+        
         kbs = cls.model.select().join(UserTenant, on=(UserTenant.tenant_id == Knowledgebase.tenant_id)
-                                      ).where(cls.model.name == kb_name, UserTenant.user_id == user_id).paginate(0, 1)
-        kbs = kbs.dicts()
+                                      ).where(cls.model.name == kb_name, UserTenant.user_id == user_id)
+        
+        # Add LLM Workbench user filtering
+        llm_wb_user_id = get_llm_workbench_user_id()
+        if llm_wb_user_id:
+            kbs = kbs.where(cls.model.llm_workbench_user_id == llm_wb_user_id)
+        
+        kbs = kbs.paginate(0, 1).dicts()
         return list(kbs)
 
     @classmethod

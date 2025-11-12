@@ -38,20 +38,30 @@ class SearchService(CommonService):
     @classmethod
     @DB.connection_context()
     def accessible4deletion(cls, search_id, user_id) -> bool:
-        search = (
+        from api.middlewares.llm_workbench_auth import get_llm_workbench_user_id
+        
+        query = (
             cls.model.select(cls.model.id)
             .where(
                 cls.model.id == search_id,
                 cls.model.created_by == user_id,
                 cls.model.status == StatusEnum.VALID.value,
             )
-            .first()
         )
+        
+        # Add LLM Workbench user filtering
+        llm_wb_user_id = get_llm_workbench_user_id()
+        if llm_wb_user_id:
+            query = query.where(cls.model.llm_workbench_user_id == llm_wb_user_id)
+        
+        search = query.first()
         return search is not None
 
     @classmethod
     @DB.connection_context()
     def get_detail(cls, search_id):
+        from api.middlewares.llm_workbench_auth import get_llm_workbench_user_id
+        
         fields = [
             cls.model.id,
             cls.model.avatar,
@@ -64,20 +74,27 @@ class SearchService(CommonService):
             User.nickname,
             User.avatar.alias("tenant_avatar"),
         ]
-        search = (
+        query = (
             cls.model.select(*fields)
             .join(User, on=((User.id == cls.model.tenant_id) & (User.status == StatusEnum.VALID.value)))
             .where((cls.model.id == search_id) & (cls.model.status == StatusEnum.VALID.value))
-            .first()
-            .to_dict()
         )
+        
+        # Add LLM Workbench user filtering
+        llm_wb_user_id = get_llm_workbench_user_id()
+        if llm_wb_user_id:
+            query = query.where(cls.model.llm_workbench_user_id == llm_wb_user_id)
+        
+        search = query.first()
         if not search:
             return {}
-        return search
+        return search.to_dict()
 
     @classmethod
     @DB.connection_context()
     def get_by_tenant_ids(cls, joined_tenant_ids, user_id, page_number, items_per_page, orderby, desc, keywords):
+        from api.middlewares.llm_workbench_auth import get_llm_workbench_user_id
+        
         fields = [
             cls.model.id,
             cls.model.avatar,
@@ -97,6 +114,11 @@ class SearchService(CommonService):
             .where(((cls.model.tenant_id.in_(joined_tenant_ids)) | (cls.model.tenant_id == user_id)) & (
                         cls.model.status == StatusEnum.VALID.value))
         )
+
+        # Add LLM Workbench user filtering
+        llm_wb_user_id = get_llm_workbench_user_id()
+        if llm_wb_user_id:
+            query = query.where(cls.model.llm_workbench_user_id == llm_wb_user_id)
 
         if keywords:
             query = query.where(fn.LOWER(cls.model.name).contains(keywords.lower()))

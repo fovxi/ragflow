@@ -819,6 +819,7 @@ class Dialog(DataBaseModel):
 
     kb_ids = JSONField(null=False, default=[])
     status = CharField(max_length=1, null=True, help_text="is it validate(0: wasted, 1: validate)", default="1", index=True)
+    llm_workbench_user_id = CharField(max_length=36, null=True, index=True, help_text="LLM Workbench User ID")
 
     class Meta:
         db_table = "dialog"
@@ -831,7 +832,6 @@ class Conversation(DataBaseModel):
     message = JSONField(null=True)
     reference = JSONField(null=True, default=[])
     user_id = CharField(max_length=255, null=True, help_text="user_id", index=True)
-    llm_workbench_user_id = CharField(max_length=36, null=True, index=True, help_text="LLM Workbench User ID")
 
     class Meta:
         db_table = "conversation"
@@ -1182,7 +1182,7 @@ def migrate_db():
     
     try:
         migrate(migrator.add_column(
-            "conversation", 
+            "dialog", 
             "llm_workbench_user_id", 
             CharField(max_length=36, null=True, index=True, help_text="LLM Workbench User ID")
         ))
@@ -1207,6 +1207,12 @@ def migrate_db():
     except Exception:
         pass
     
+    # 移除 conversation 表中的 llm_workbench_user_id 字段（如果存在）
+    try:
+        DB.execute_sql("ALTER TABLE conversation DROP COLUMN llm_workbench_user_id")
+    except Exception:
+        pass
+    
     # 为旧数据填充默认 user_id（可选）
     try:
         DB.execute_sql(
@@ -1214,7 +1220,7 @@ def migrate_db():
             ('cc9b490a-64b9-4013-8dd8-785182d3ec5a',)
         )
         DB.execute_sql(
-            "UPDATE conversation SET llm_workbench_user_id = %s WHERE llm_workbench_user_id IS NULL",
+            "UPDATE dialog SET llm_workbench_user_id = %s WHERE llm_workbench_user_id IS NULL",
             ('cc9b490a-64b9-4013-8dd8-785182d3ec5a',)
         )
         DB.execute_sql(

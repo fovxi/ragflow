@@ -318,8 +318,14 @@ def my_llms():
         include_details = request.args.get('include_details', 'false').lower() == 'true'
 
         if include_details:
+            from api.middlewares.llm_workbench_auth import get_llm_workbench_user_id
+            
             res = {}
             objs = TenantLLMService.query(tenant_id=current_user.id)
+            # Filter by LLM Workbench user ID
+            llm_wb_user_id = get_llm_workbench_user_id()
+            if llm_wb_user_id:
+                objs = [o for o in objs if o.llm_workbench_user_id == llm_wb_user_id]
             factories = LLMFactoriesService.query(status=StatusEnum.VALID.value)
 
             for o in objs:
@@ -369,7 +375,13 @@ def list_app():
     weighted = ["Youdao", "FastEmbed", "BAAI"] if settings.LIGHTEN != 0 else []
     model_type = request.args.get("model_type")
     try:
+        from api.middlewares.llm_workbench_auth import get_llm_workbench_user_id
+        
         objs = TenantLLMService.query(tenant_id=current_user.id)
+        # Filter by LLM Workbench user ID
+        llm_wb_user_id = get_llm_workbench_user_id()
+        if llm_wb_user_id:
+            objs = [o for o in objs if o.llm_workbench_user_id == llm_wb_user_id]
         facts = set([o.to_dict()["llm_factory"] for o in objs if o.api_key])
         llms = LLMService.get_all()
         llms = [m.to_dict()
