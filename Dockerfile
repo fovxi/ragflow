@@ -59,7 +59,7 @@ RUN --mount=type=cache,id=ragflow_apt,target=/var/cache/apt,sharing=locked \
     apt install -y python3-pip pipx nginx unzip curl wget git vim less && \
     apt install -y ghostscript
 
-RUN curl -LsSf https://ghp.ci/https://github.com/astral-sh/uv/releases/download/0.9.8/uv-x86_64-unknown-linux-gnu.tar.gz -o /tmp/uv.tar.gz && \
+RUN curl -LsSf https://gh-proxy.com/https://github.com/astral-sh/uv/releases/download/0.9.8/uv-x86_64-unknown-linux-gnu.tar.gz -o /tmp/uv.tar.gz && \
     tar -xzf /tmp/uv.tar.gz -C /tmp && \
     mv /tmp/uv-x86_64-unknown-linux-gnu/uv /usr/local/bin/uv && \
     mv /tmp/uv-x86_64-unknown-linux-gnu/uvx /usr/local/bin/uvx && \
