@@ -59,18 +59,16 @@ RUN --mount=type=cache,id=ragflow_apt,target=/var/cache/apt,sharing=locked \
     apt install -y python3-pip pipx nginx unzip curl wget git vim less && \
     apt install -y ghostscript
 
-RUN curl -LsSf https://astral.sh/uv/install.sh | sh && \
+RUN curl -LsSf https://ghp.ci/https://github.com/astral-sh/uv/releases/download/0.9.8/uv-x86_64-unknown-linux-gnu.tar.gz -o /tmp/uv.tar.gz && \
+    tar -xzf /tmp/uv.tar.gz -C /tmp && \
+    mv /tmp/uv-x86_64-unknown-linux-gnu/uv /usr/local/bin/uv && \
+    mv /tmp/uv-x86_64-unknown-linux-gnu/uvx /usr/local/bin/uvx && \
+    rm -rf /tmp/uv.tar.gz /tmp/uv-x86_64-unknown-linux-gnu && \
+    chmod +x /usr/local/bin/uv /usr/local/bin/uvx && \
     mkdir -p /etc/uv && \
     echo "[[index]]" > /etc/uv/uv.toml && \
     echo 'url = "https://mirrors.aliyun.com/pypi/simple"' >> /etc/uv/uv.toml && \
     echo "default = true" >> /etc/uv/uv.toml && \
-    if [ -f /root/.local/bin/uv ]; then \
-        ln -sf /root/.local/bin/uv /usr/local/bin/uv && \
-        ln -sf /root/.local/bin/uvx /usr/local/bin/uvx; \
-    elif [ -f /root/.cargo/bin/uv ]; then \
-        ln -sf /root/.cargo/bin/uv /usr/local/bin/uv && \
-        ln -sf /root/.cargo/bin/uvx /usr/local/bin/uvx; \
-    fi && \
     uv --version
 
 ENV PYTHONDONTWRITEBYTECODE=1 DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=1
