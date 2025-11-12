@@ -57,19 +57,11 @@ class TenantLLMService(CommonService):
     @classmethod
     @DB.connection_context()
     def get_my_llms(cls, tenant_id):
-        from api.middlewares.llm_workbench_auth import get_llm_workbench_user_id
-        
         fields = [cls.model.llm_factory, LLMFactories.logo, LLMFactories.tags, cls.model.model_type, cls.model.llm_name,
                   cls.model.used_tokens]
-        query = cls.model.select(*fields).join(LLMFactories, on=(cls.model.llm_factory == LLMFactories.name)).where(
-            cls.model.tenant_id == tenant_id, ~cls.model.api_key.is_null())
-        
-        # Add LLM Workbench user filtering
-        llm_wb_user_id = get_llm_workbench_user_id()
-        if llm_wb_user_id:
-            query = query.where(cls.model.llm_workbench_user_id == llm_wb_user_id)
-        
-        objs = query.dicts()
+        objs = cls.model.select(*fields).join(LLMFactories, on=(cls.model.llm_factory == LLMFactories.name)).where(
+            cls.model.tenant_id == tenant_id, ~cls.model.api_key.is_null()).dicts()
+
         return list(objs)
 
     @staticmethod

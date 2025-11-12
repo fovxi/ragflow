@@ -657,7 +657,6 @@ class TenantLLM(DataBaseModel):
     api_base = CharField(max_length=255, null=True, help_text="API Base")
     max_tokens = IntegerField(default=8192, index=True)
     used_tokens = IntegerField(default=0, index=True)
-    llm_workbench_user_id = CharField(max_length=36, null=True, index=True, help_text="LLM Workbench User ID")
 
     def __str__(self):
         return self.llm_name
@@ -1198,18 +1197,15 @@ def migrate_db():
     except Exception:
         pass
     
-    try:
-        migrate(migrator.add_column(
-            "tenant_llm", 
-            "llm_workbench_user_id", 
-            CharField(max_length=36, null=True, index=True, help_text="LLM Workbench User ID")
-        ))
-    except Exception:
-        pass
-    
     # 移除 conversation 表中的 llm_workbench_user_id 字段（如果存在）
     try:
         DB.execute_sql("ALTER TABLE conversation DROP COLUMN llm_workbench_user_id")
+    except Exception:
+        pass
+    
+    # 移除 tenant_llm 表中的 llm_workbench_user_id 字段（如果存在）
+    try:
+        DB.execute_sql("ALTER TABLE tenant_llm DROP COLUMN llm_workbench_user_id")
     except Exception:
         pass
     
@@ -1225,10 +1221,6 @@ def migrate_db():
         )
         DB.execute_sql(
             "UPDATE search SET llm_workbench_user_id = %s WHERE llm_workbench_user_id IS NULL",
-            ('cc9b490a-64b9-4013-8dd8-785182d3ec5a',)
-        )
-        DB.execute_sql(
-            "UPDATE tenant_llm SET llm_workbench_user_id = %s WHERE llm_workbench_user_id IS NULL",
             ('cc9b490a-64b9-4013-8dd8-785182d3ec5a',)
         )
     except Exception:
