@@ -62,15 +62,16 @@ RUN --mount=type=cache,id=ragflow_apt,target=/var/cache/apt,sharing=locked \
     apt install -y python3-pip pipx nginx unzip curl wget git vim less && \
     apt install -y ghostscript
 
+RUN curl -LsSf https://astral.sh/uv/install.sh | sh && \
+    ln -s /root/.local/bin/uv /usr/local/bin/uv && \
+    ln -s /root/.local/bin/uvx /usr/local/bin/uvx
+
 RUN if [ "$NEED_MIRROR" == "1" ]; then \
-        pip3 config set global.index-url https://mirrors.aliyun.com/pypi/simple && \
-        pip3 config set global.trusted-host mirrors.aliyun.com; \
         mkdir -p /etc/uv && \
         echo "[[index]]" > /etc/uv/uv.toml && \
         echo 'url = "https://mirrors.aliyun.com/pypi/simple"' >> /etc/uv/uv.toml && \
         echo "default = true" >> /etc/uv/uv.toml; \
-    fi; \
-    pipx install uv
+    fi
 
 ENV PYTHONDONTWRITEBYTECODE=1 DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=1
 ENV PATH=/root/.local/bin:$PATH
