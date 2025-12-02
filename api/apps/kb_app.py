@@ -26,6 +26,7 @@ from api.db.services.file_service import FileService
 from api.db.services.pipeline_operation_log_service import PipelineOperationLogService
 from api.db.services.task_service import TaskService, GRAPH_RAPTOR_FAKE_DOC_ID
 from api.db.services.user_service import TenantService, UserTenantService
+from api.middlewares.llm_workbench_auth import get_llm_workbench_user_id
 from api.utils.api_utils import get_error_data_result, server_error_response, get_data_error_result, validate_request, not_allowed_parameters
 from api.utils import get_uuid
 from api.db import PipelineTaskType, StatusEnum, FileSource, VALID_FILE_TYPES, VALID_TASK_STATUS
@@ -65,6 +66,7 @@ def create():
         req["name"] = dataset_name
         req["tenant_id"] = current_user.id
         req["created_by"] = current_user.id
+        req["llm_workbench_user_id"] = get_llm_workbench_user_id()
         if not req.get("parser_id"):
             req["parser_id"] = "naive"
         e, t = TenantService.get_by_id(current_user.id)

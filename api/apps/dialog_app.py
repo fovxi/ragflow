@@ -22,6 +22,7 @@ from api.db import StatusEnum
 from api.db.services.tenant_llm_service import TenantLLMService
 from api.db.services.knowledgebase_service import KnowledgebaseService
 from api.db.services.user_service import TenantService, UserTenantService
+from api.middlewares.llm_workbench_auth import get_llm_workbench_user_id
 from api import settings
 from api.utils.api_utils import server_error_response, get_data_error_result, validate_request
 from api.utils import get_uuid
@@ -102,7 +103,8 @@ def set_dialog():
                 "rerank_id": rerank_id,
                 "similarity_threshold": similarity_threshold,
                 "vector_similarity_weight": vector_similarity_weight,
-                "icon": icon
+                "icon": icon,
+                "llm_workbench_user_id": get_llm_workbench_user_id()
             }
             if not DialogService.save(**dia):
                 return get_data_error_result(message="Fail to new a dialog!")

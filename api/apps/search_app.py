@@ -24,6 +24,7 @@ from api.db.db_models import DB
 from api.db.services import duplicate_name
 from api.db.services.search_service import SearchService
 from api.db.services.user_service import TenantService, UserTenantService
+from api.middlewares.llm_workbench_auth import get_llm_workbench_user_id
 from api.utils import get_uuid
 from api.utils.api_utils import get_data_error_result, get_json_result, not_allowed_parameters, server_error_response, validate_request
 
@@ -53,6 +54,7 @@ def create():
     req["description"] = description
     req["tenant_id"] = current_user.id
     req["created_by"] = current_user.id
+    req["llm_workbench_user_id"] = get_llm_workbench_user_id()
     with DB.atomic():
         try:
             if not SearchService.save(**req):
