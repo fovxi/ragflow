@@ -535,7 +535,7 @@ def fill_db_model_object(model_object, human_model_dict):
 
 class User(DataBaseModel, UserMixin):
     id = CharField(max_length=32, primary_key=True)
-    access_token = TextField(null=True, index=True)
+    access_token = TextField(null=True)  # TEXT类型不能在MySQL中直接创建索引
     nickname = CharField(max_length=100, null=False, help_text="nicky name", index=True)
     password = CharField(max_length=255, null=True, help_text="password", index=True)
     email = CharField(max_length=255, null=False, help_text="email", index=True)
@@ -1130,7 +1130,7 @@ def migrate_db():
     except Exception:
         pass
     try:
-        migrate(migrator.alter_column_type("user", "access_token", TextField(null=True, index=True)))
+        migrate(migrator.alter_column_type("user", "access_token", TextField(null=True)))  # TEXT类型不能在MySQL中直接创建索引
     except Exception:
         pass
     try:
