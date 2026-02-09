@@ -28,6 +28,7 @@ from api.db.services.llm_service import LLMBundle
 from api.db.services.search_service import SearchService
 from api.db.services.tenant_llm_service import TenantLLMService
 from api.db.services.user_service import TenantService, UserTenantService
+from api.middlewares.llm_workbench_auth import get_llm_workbench_user_id
 from api.utils.api_utils import get_data_error_result, get_json_result, server_error_response, validate_request
 from rag.prompts.template import load_prompt
 from rag.prompts.generator import chunks_format
@@ -40,7 +41,15 @@ def set_conversation():
     conv_id = req.get("conversation_id")
     is_new = req.get("is_new")
     name = req.get("name", "New conversation")
-    req["user_id"] = current_user.id
+    llm_wb_user_id = get_llm_workbench_user_id()
+    if not llm_wb_user_id:
+        return get_json_result(
+            data=False,
+            message="Missing X-LLM-Workbench-User-ID header.",
+            code=settings.RetCode.AUTHENTICATION_ERROR,
+        )
+    effective_user_id = llm_wb_user_id
+    req["user_id"] = effective_user_id
 
     if len(name) > 255:
         name = name[0:255]
@@ -49,6 +58,11 @@ def set_conversation():
     if not is_new:
         del req["conversation_id"]
         try:
+            e, conv = ConversationService.get_by_id(conv_id)
+            if not e:
+                return get_data_error_result(message="Conversation not found!")
+            if conv.user_id != llm_wb_user_id:
+                return get_json_result(data=False, message="Only owner of conversation authorized for this operation.", code=settings.RetCode.OPERATING_ERROR)
             if not ConversationService.update_by_id(conv_id, req):
                 return get_data_error_result(message="Conversation not found!")
             e, conv = ConversationService.get_by_id(conv_id)
@@ -68,7 +82,7 @@ def set_conversation():
             "dialog_id": req["dialog_id"],
             "name": name,
             "message": [{"role": "assistant", "content": dia.prompt_config["prologue"]}],
-            "user_id": current_user.id,
+            "user_id": effective_user_id,
             "reference": [],
         }
         ConversationService.save(**conv)
@@ -85,6 +99,15 @@ def get():
         e, conv = ConversationService.get_by_id(conv_id)
         if not e:
             return get_data_error_result(message="Conversation not found!")
+        llm_wb_user_id = get_llm_workbench_user_id()
+        if not llm_wb_user_id:
+            return get_json_result(
+                data=False,
+                message="Missing X-LLM-Workbench-User-ID header.",
+                code=settings.RetCode.AUTHENTICATION_ERROR,
+            )
+        if conv.user_id != llm_wb_user_id:
+            return get_json_result(data=False, message="Only owner of conversation authorized for this operation.", code=settings.RetCode.OPERATING_ERROR)
         tenants = UserTenantService.query(user_id=current_user.id)
         avatar = None
         for tenant in tenants:
@@ -137,6 +160,15 @@ def rm():
             exist, conv = ConversationService.get_by_id(cid)
             if not exist:
                 return get_data_error_result(message="Conversation not found!")
+            llm_wb_user_id = get_llm_workbench_user_id()
+            if not llm_wb_user_id:
+                return get_json_result(
+                    data=False,
+                    message="Missing X-LLM-Workbench-User-ID header.",
+                    code=settings.RetCode.AUTHENTICATION_ERROR,
+                )
+            if conv.user_id != llm_wb_user_id:
+                return get_json_result(data=False, message="Only owner of conversation authorized for this operation.", code=settings.RetCode.OPERATING_ERROR)
             tenants = UserTenantService.query(user_id=current_user.id)
             for tenant in tenants:
                 if DialogService.query(tenant_id=tenant.tenant_id, id=conv.dialog_id):
@@ -156,7 +188,19 @@ def list_conversation():
     try:
         if not DialogService.query(tenant_id=current_user.id, id=dialog_id):
             return get_json_result(data=False, message="Only owner of dialog authorized for this operation.", code=settings.RetCode.OPERATING_ERROR)
-        convs = ConversationService.query(dialog_id=dialog_id, order_by=ConversationService.model.create_time, reverse=True)
+        llm_wb_user_id = get_llm_workbench_user_id()
+        if not llm_wb_user_id:
+            return get_json_result(
+                data=False,
+                message="Missing X-LLM-Workbench-User-ID header.",
+                code=settings.RetCode.AUTHENTICATION_ERROR,
+            )
+        convs = ConversationService.query(
+            dialog_id=dialog_id,
+            user_id=llm_wb_user_id,
+            order_by=ConversationService.model.create_time,
+            reverse=True,
+        )
 
         convs = [d.to_dict() for d in convs]
         return get_json_result(data=convs)
@@ -196,6 +240,15 @@ def completion():
         e, conv = ConversationService.get_by_id(req["conversation_id"])
         if not e:
             return get_data_error_result(message="Conversation not found!")
+        llm_wb_user_id = get_llm_workbench_user_id()
+        if not llm_wb_user_id:
+            return get_json_result(
+                data=False,
+                message="Missing X-LLM-Workbench-User-ID header.",
+                code=settings.RetCode.AUTHENTICATION_ERROR,
+            )
+        if conv.user_id != llm_wb_user_id:
+            return get_json_result(data=False, message="Only owner of conversation authorized for this operation.", code=settings.RetCode.OPERATING_ERROR)
         conv.message = deepcopy(req["messages"])
         e, dia = DialogService.get_by_id(conv.dialog_id)
         if not e:

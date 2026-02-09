@@ -21,6 +21,15 @@ from peewee import InterfaceError, OperationalError
 from api.db.db_models import DB
 from api.utils import current_timestamp, datetime_format, get_uuid
 
+
+def _get_llm_workbench_user_id_safe():
+    try:
+        from api.middlewares.llm_workbench_auth import get_llm_workbench_user_id
+        return get_llm_workbench_user_id()
+    except Exception:
+        return None
+
+
 def retry_db_operation(func):
     @retry(
         stop=stop_after_attempt(3),
@@ -65,6 +74,10 @@ class CommonService:
         Returns:
             peewee.ModelSelect: A query result containing matching records.
         """
+        if hasattr(cls.model, "llm_workbench_user_id") and "llm_workbench_user_id" not in kwargs:
+            llm_wb_user_id = _get_llm_workbench_user_id_safe()
+            if llm_wb_user_id:
+                kwargs["llm_workbench_user_id"] = llm_wb_user_id
         return cls.model.query(cols=cols, reverse=reverse, order_by=order_by, **kwargs)
 
     @classmethod
@@ -221,11 +234,18 @@ class CommonService:
             data_list (list): List of dictionaries containing record data to update.
                              Each dictionary must include an 'id' field.
         """
+        llm_wb_user_id = None
+        if hasattr(cls.model, "llm_workbench_user_id"):
+            llm_wb_user_id = _get_llm_workbench_user_id_safe()
+
         with DB.atomic():
             for data in data_list:
                 data["update_time"] = current_timestamp()
                 data["update_date"] = datetime_format(datetime.now())
-                cls.model.update(data).where(cls.model.id == data["id"]).execute()
+                query = cls.model.update(data).where(cls.model.id == data["id"])
+                if llm_wb_user_id:
+                    query = query.where(cls.model.llm_workbench_user_id == llm_wb_user_id)
+                query.execute()
 
     @classmethod
     @DB.connection_context()
@@ -239,7 +259,12 @@ class CommonService:
         #     Number of records updated
         data["update_time"] = current_timestamp()
         data["update_date"] = datetime_format(datetime.now())
-        num = cls.model.update(data).where(cls.model.id == pid).execute()
+        query = cls.model.update(data).where(cls.model.id == pid)
+        if hasattr(cls.model, "llm_workbench_user_id"):
+            llm_wb_user_id = _get_llm_workbench_user_id_safe()
+            if llm_wb_user_id:
+                query = query.where(cls.model.llm_workbench_user_id == llm_wb_user_id)
+        num = query.execute()
         return num
 
     @classmethod
@@ -251,7 +276,13 @@ class CommonService:
         # Returns:
         #     Tuple of (success, record)
         try:
-            obj = cls.model.get_or_none(cls.model.id == pid)
+            llm_wb_user_id = None
+            if hasattr(cls.model, "llm_workbench_user_id"):
+                llm_wb_user_id = _get_llm_workbench_user_id_safe()
+            if llm_wb_user_id:
+                obj = cls.model.get_or_none((cls.model.id == pid) & (cls.model.llm_workbench_user_id == llm_wb_user_id))
+            else:
+                obj = cls.model.get_or_none(cls.model.id == pid)
             if obj:
                 return True, obj
         except Exception:
@@ -271,7 +302,12 @@ class CommonService:
             objs = cls.model.select(*cols)
         else:
             objs = cls.model.select()
-        return objs.where(cls.model.id.in_(pids))
+        query = objs.where(cls.model.id.in_(pids))
+        if hasattr(cls.model, "llm_workbench_user_id"):
+            llm_wb_user_id = _get_llm_workbench_user_id_safe()
+            if llm_wb_user_id:
+                query = query.where(cls.model.llm_workbench_user_id == llm_wb_user_id)
+        return query
 
     @classmethod
     @DB.connection_context()
@@ -281,7 +317,12 @@ class CommonService:
         #     pid: Record ID
         # Returns:
         #     Number of records deleted
-        return cls.model.delete().where(cls.model.id == pid).execute()
+        query = cls.model.delete().where(cls.model.id == pid)
+        if hasattr(cls.model, "llm_workbench_user_id"):
+            llm_wb_user_id = _get_llm_workbench_user_id_safe()
+            if llm_wb_user_id:
+                query = query.where(cls.model.llm_workbench_user_id == llm_wb_user_id)
+        return query.execute()
     
     @classmethod
     @DB.connection_context()
@@ -292,7 +333,12 @@ class CommonService:
         # Returns:
         #     Number of records deleted
         with DB.atomic():
-            res = cls.model.delete().where(cls.model.id.in_(pids)).execute()
+            query = cls.model.delete().where(cls.model.id.in_(pids))
+            if hasattr(cls.model, "llm_workbench_user_id"):
+                llm_wb_user_id = _get_llm_workbench_user_id_safe()
+                if llm_wb_user_id:
+                    query = query.where(cls.model.llm_workbench_user_id == llm_wb_user_id)
+            res = query.execute()
             return res
 
     @classmethod

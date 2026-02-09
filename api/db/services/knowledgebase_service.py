@@ -69,8 +69,14 @@ class KnowledgebaseService(CommonService):
                 2. The user is not the creator of the knowledge base
         """
         # Check if a knowledge base can be deleted by a user
+        from api.middlewares.llm_workbench_auth import get_llm_workbench_user_id
+
         docs = cls.model.select(
-            cls.model.id).where(cls.model.id == kb_id, cls.model.created_by == user_id).paginate(0, 1)
+            cls.model.id).where(cls.model.id == kb_id, cls.model.created_by == user_id)
+        llm_wb_user_id = get_llm_workbench_user_id()
+        if llm_wb_user_id:
+            docs = docs.where(cls.model.llm_workbench_user_id == llm_wb_user_id)
+        docs = docs.paginate(0, 1)
         docs = docs.dicts()
         if not docs:
             return False

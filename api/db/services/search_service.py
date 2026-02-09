@@ -19,7 +19,7 @@ from peewee import fn
 
 from api.db import StatusEnum
 from api.db.db_models import DB, Search, User
-from api.db.services.common_service import CommonService
+from api.db.services.common_service import CommonService, _get_llm_workbench_user_id_safe
 from api.utils import current_timestamp, datetime_format
 
 
@@ -32,6 +32,10 @@ class SearchService(CommonService):
         kwargs["create_date"] = datetime_format(datetime.now())
         kwargs["update_time"] = current_timestamp()
         kwargs["update_date"] = datetime_format(datetime.now())
+        if hasattr(cls.model, "llm_workbench_user_id") and "llm_workbench_user_id" not in kwargs:
+            llm_wb_user_id = _get_llm_workbench_user_id_safe()
+            if llm_wb_user_id:
+                kwargs["llm_workbench_user_id"] = llm_wb_user_id
         obj = cls.model.create(**kwargs)
         return obj
 

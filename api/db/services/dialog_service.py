@@ -28,7 +28,7 @@ from agentic_reasoning import DeepResearcher
 from api import settings
 from api.db import LLMType, ParserType, StatusEnum
 from api.db.db_models import DB, Dialog
-from api.db.services.common_service import CommonService
+from api.db.services.common_service import CommonService, _get_llm_workbench_user_id_safe
 from api.db.services.document_service import DocumentService
 from api.db.services.knowledgebase_service import KnowledgebaseService
 from api.db.services.langfuse_service import TenantLangfuseService
@@ -61,6 +61,10 @@ class DialogService(CommonService):
         Returns:
             Model instance: The created record object.
         """
+        if hasattr(cls.model, "llm_workbench_user_id") and "llm_workbench_user_id" not in kwargs:
+            llm_wb_user_id = _get_llm_workbench_user_id_safe()
+            if llm_wb_user_id:
+                kwargs["llm_workbench_user_id"] = llm_wb_user_id
         sample_obj = cls.model(**kwargs).save(force_insert=True)
         return sample_obj
 

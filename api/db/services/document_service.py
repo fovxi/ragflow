@@ -485,12 +485,18 @@ class DocumentService(CommonService):
     @classmethod
     @DB.connection_context()
     def accessible(cls, doc_id, user_id):
+        from api.middlewares.llm_workbench_auth import get_llm_workbench_user_id
+
         docs = cls.model.select(
             cls.model.id).join(
             Knowledgebase, on=(
                     Knowledgebase.id == cls.model.kb_id)
         ).join(UserTenant, on=(UserTenant.tenant_id == Knowledgebase.tenant_id)
-               ).where(cls.model.id == doc_id, UserTenant.user_id == user_id).paginate(0, 1)
+               ).where(cls.model.id == doc_id, UserTenant.user_id == user_id)
+        llm_wb_user_id = get_llm_workbench_user_id()
+        if llm_wb_user_id:
+            docs = docs.where(Knowledgebase.llm_workbench_user_id == llm_wb_user_id)
+        docs = docs.paginate(0, 1)
         docs = docs.dicts()
         if not docs:
             return False
@@ -499,6 +505,8 @@ class DocumentService(CommonService):
     @classmethod
     @DB.connection_context()
     def accessible4deletion(cls, doc_id, user_id):
+        from api.middlewares.llm_workbench_auth import get_llm_workbench_user_id
+
         docs = cls.model.select(cls.model.id
                                 ).join(
             Knowledgebase, on=(
@@ -510,7 +518,11 @@ class DocumentService(CommonService):
             cls.model.id == doc_id,
             UserTenant.status == StatusEnum.VALID.value,
             ((UserTenant.role == UserTenantRole.NORMAL) | (UserTenant.role == UserTenantRole.OWNER))
-        ).paginate(0, 1)
+        )
+        llm_wb_user_id = get_llm_workbench_user_id()
+        if llm_wb_user_id:
+            docs = docs.where(Knowledgebase.llm_workbench_user_id == llm_wb_user_id)
+        docs = docs.paginate(0, 1)
         docs = docs.dicts()
         if not docs:
             return False

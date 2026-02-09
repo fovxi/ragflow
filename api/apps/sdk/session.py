@@ -35,6 +35,7 @@ from api.db.services.knowledgebase_service import KnowledgebaseService
 from api.db.services.llm_service import LLMBundle
 from api.db.services.search_service import SearchService
 from api.db.services.user_service import UserTenantService
+from api.middlewares.llm_workbench_auth import get_llm_workbench_user_id
 from api.utils import get_uuid
 from api.utils.api_utils import check_duplicate_ids, get_data_openai, get_error_data_result, get_json_result, \
     get_result, server_error_response, token_required, validate_request
@@ -502,7 +503,10 @@ def list_session(tenant_id, chat_id):
     page_number = int(request.args.get("page", 1))
     items_per_page = int(request.args.get("page_size", 30))
     orderby = request.args.get("orderby", "create_time")
-    user_id = request.args.get("user_id")
+    llm_wb_user_id = get_llm_workbench_user_id()
+    if not llm_wb_user_id:
+        return get_error_data_result(message="Missing X-LLM-Workbench-User-ID header.")
+    user_id = llm_wb_user_id
     if request.args.get("desc") == "False" or request.args.get("desc") == "false":
         desc = False
     else:
