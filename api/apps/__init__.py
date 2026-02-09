@@ -27,6 +27,7 @@ from itsdangerous.url_safe import URLSafeTimedSerializer as Serializer
 from api.db import StatusEnum
 from api.db.db_models import close_connection
 from api.db.services import UserService
+from api.db.services.user_access_token_service import UserAccessTokenService
 from api.utils.json import CustomJSONEncoder
 from api.utils import commands
 
@@ -150,34 +151,33 @@ client_urls_prefix = [
 def load_user(web_request):
     jwt = Serializer(secret_key=settings.SECRET_KEY)
     authorization = web_request.headers.get("Authorization")
-    if authorization:
-        try:
-            access_token = str(jwt.loads(authorization))
-
-            if not access_token or not access_token.strip():
-                logging.warning("Authentication attempt with empty access token")
-                return None
-
-            # Access tokens should be UUIDs (32 hex characters)
-            if len(access_token.strip()) < 32:
-                logging.warning(f"Authentication attempt with invalid token format: {len(access_token)} chars")
-                return None
-
-            user = UserService.query(
-                access_token=access_token, status=StatusEnum.VALID.value
-            )
-            if user:
-                if not user[0].access_token or not user[0].access_token.strip():
-                    logging.warning(f"User {user[0].email} has empty access_token in database")
-                    return None
-                return user[0]
-            else:
-                return None
-        except Exception as e:
-            logging.warning(f"load_user got exception {e}")
-            return None
-    else:
+    if not authorization:
         return None
+    try:
+        access_token = str(jwt.loads(authorization))
+    except Exception as e:
+        logging.warning(f"load_user got exception {e}")
+        return None
+
+    if not access_token or not access_token.strip():
+        logging.warning("Authentication attempt with empty access token")
+        return None
+
+    if len(access_token.strip()) < 32:
+        logging.warning(f"Authentication attempt with invalid token format: {len(access_token)} chars")
+        return None
+
+    user_id = UserAccessTokenService.get_user_id_by_token(access_token)
+    if not user_id:
+        return None
+
+    user = UserService.query(id=user_id, status=StatusEnum.VALID.value)
+    if user:
+        user_obj = user[0]
+        user_obj._current_token = access_token
+        UserAccessTokenService.touch_token(access_token)
+        return user_obj
+    return None
 
 
 @app.teardown_request

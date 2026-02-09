@@ -16,7 +16,6 @@
 import json
 import logging
 import re
-import secrets
 from datetime import datetime
 
 from flask import redirect, request, session
@@ -31,6 +30,7 @@ from api.db.services.file_service import FileService
 from api.db.services.llm_service import get_init_tenant_llm
 from api.db.services.tenant_llm_service import TenantLLMService
 from api.db.services.user_service import TenantService, UserService, UserTenantService
+from api.db.services.user_access_token_service import UserAccessTokenService
 from api.utils import (
     current_timestamp,
     datetime_format,
@@ -46,32 +46,6 @@ from api.utils.api_utils import (
     validate_request,
 )
 from api.utils.crypt import decrypt
-
-
-def manage_user_tokens(user, new_token, max_tokens=20):
-    """
-    管理用户token，限制最大数量并添加新token
-    
-    Args:
-        user: 用户对象
-        new_token: 新生成的token
-        max_tokens: 最大token数量，默认20个
-    """
-    if not user.access_token or not user.access_token.strip():
-        # 如果没有token，直接设置新token
-        user.access_token = new_token
-    else:
-        # 如果已有token，将新token添加到现有token列表中（用|分隔）
-        existing_tokens = user.access_token.split('|')
-        # 保留所有有效token，但限制最大数量
-        existing_tokens = [t for t in existing_tokens if t.strip()]
-        existing_tokens.append(new_token)
-        
-        # 限制最大token数量，删除最旧的token
-        if len(existing_tokens) > max_tokens:
-            existing_tokens = existing_tokens[-max_tokens:]  # 保留最新的N个
-        
-        user.access_token = '|'.join(existing_tokens)
 
 
 @manager.route("/login", methods=["POST", "GET"])  # noqa: F821
@@ -135,10 +109,7 @@ def login():
         response_data = user.to_json()
         # 为每次登录生成新的token，支持多端同时登录
         new_token = get_uuid()
-        
-        # 使用统一的token管理函数
-        manage_user_tokens(user, new_token)
-        
+        UserAccessTokenService.create_token(user.id, new_token, login_channel="password")
         # 临时设置当前token用于get_id()
         user._current_token = new_token
         login_user(user)
@@ -256,6 +227,9 @@ def oauth_callback(channel):
 
                 # Try to log in
                 user = users[0]
+                new_token = get_uuid()
+                UserAccessTokenService.create_token(user.id, new_token, login_channel=channel)
+                user._current_token = new_token
                 login_user(user)
                 return redirect(f"/?auth={user.get_id()}")
 
@@ -269,13 +243,8 @@ def oauth_callback(channel):
         if user and hasattr(user, 'is_active') and user.is_active == "0":
             return redirect("/?error=user_inactive")
             
-        # 为每次登录生成新的token，支持多端同时登录
         new_token = get_uuid()
-        
-        # 使用统一的token管理函数
-        manage_user_tokens(user, new_token)
-        
-        # 临时设置当前token用于get_id()
+        UserAccessTokenService.create_token(user.id, new_token, login_channel=channel)
         user._current_token = new_token
         user.save()
         login_user(user)
@@ -357,6 +326,9 @@ def github_callback():
 
             # Try to log in
             user = users[0]
+            new_token = get_uuid()
+            UserAccessTokenService.create_token(user.id, new_token, login_channel="github")
+            user._current_token = new_token
             login_user(user)
             return redirect("/?auth=%s" % user.get_id())
         except Exception as e:
@@ -369,13 +341,8 @@ def github_callback():
     if user and hasattr(user, 'is_active') and user.is_active == "0":
         return redirect("/?error=user_inactive")
     
-    # 为每次登录生成新的token，支持多端同时登录
     new_token = get_uuid()
-    
-    # 使用统一的token管理函数
-    manage_user_tokens(user, new_token)
-    
-    # 临时设置当前token用于get_id()
+    UserAccessTokenService.create_token(user.id, new_token, login_channel="github")
     user._current_token = new_token
     user.save()
     login_user(user)
@@ -469,6 +436,9 @@ def feishu_callback():
 
             # Try to log in
             user = users[0]
+            new_token = get_uuid()
+            UserAccessTokenService.create_token(user.id, new_token, login_channel="feishu")
+            user._current_token = new_token
             login_user(user)
             return redirect("/?auth=%s" % user.get_id())
         except Exception as e:
@@ -481,13 +451,8 @@ def feishu_callback():
     if user and hasattr(user, 'is_active') and user.is_active == "0":
         return redirect("/?error=user_inactive")
     
-    # 为每次登录生成新的token，支持多端同时登录
     new_token = get_uuid()
-    
-    # 使用统一的token管理函数
-    manage_user_tokens(user, new_token)
-    
-    # 临时设置当前token用于get_id()
+    UserAccessTokenService.create_token(user.id, new_token, login_channel="feishu")
     user._current_token = new_token
     user.save()
     login_user(user)
@@ -537,36 +502,18 @@ def log_out():
         schema:
           type: object
     """
-    # 获取当前请求的token
-    from flask import request
     from itsdangerous.url_safe import URLSafeTimedSerializer as Serializer
-    
+
     jwt = Serializer(secret_key=settings.SECRET_KEY)
     authorization = request.headers.get("Authorization")
-    current_token = None
-    
     if authorization:
         try:
             current_token = str(jwt.loads(authorization))
+            if current_token and current_token.strip():
+                UserAccessTokenService.revoke_token(current_token)
         except Exception:
             pass
-    
-    if current_token and current_user.access_token:
-        # 从token列表中移除当前token
-        existing_tokens = current_user.access_token.split('|')
-        remaining_tokens = [t.strip() for t in existing_tokens if t.strip() and t.strip() != current_token]
-        
-        if remaining_tokens:
-            # 如果还有其他token，保留它们
-            current_user.access_token = '|'.join(remaining_tokens)
-        else:
-            # 如果没有其他token，设置为无效token
-            current_user.access_token = f"INVALID_{secrets.token_hex(16)}"
-    else:
-        # 如果无法获取当前token，使用原来的逻辑
-        current_user.access_token = f"INVALID_{secrets.token_hex(16)}"
-    
-    current_user.save()
+
     logout_user()
     return get_json_result(data=True)
 
@@ -808,6 +755,9 @@ def user_add():
         if len(users) > 1:
             raise Exception(f"Same email: {email_address} exists!")
         user = users[0]
+        new_token = get_uuid()
+        UserAccessTokenService.create_token(user.id, new_token, login_channel="password")
+        user._current_token = new_token
         login_user(user)
         return construct_response(
             data=user.to_json(),

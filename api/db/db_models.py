@@ -574,6 +574,18 @@ class User(DataBaseModel, UserMixin):
         db_table = "user"
 
 
+
+class UserAccessToken(DataBaseModel):
+    id = CharField(max_length=32, primary_key=True)
+    user_id = CharField(max_length=32, null=False, index=True)
+    token = CharField(max_length=64, null=False, index=True, unique=True)
+    status = CharField(max_length=1, null=True, help_text="is it validate(0: wasted, 1: validate)", default="1", index=True)
+    login_channel = CharField(max_length=32, null=True, index=True)
+
+    class Meta:
+        db_table = "user_access_token"
+
+
 class Tenant(DataBaseModel):
     id = CharField(max_length=32, primary_key=True)
     name = CharField(max_length=100, null=True, help_text="Tenant name", index=True)
